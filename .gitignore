@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# Virtual environments
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Coverage reports
+.coverage
+.DS_Store
+
+# Python
+__pycache__/
+
+# Pytest cache
+.pytest_cache/
