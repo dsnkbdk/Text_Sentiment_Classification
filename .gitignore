@@ -1,7 +1,5 @@
 # Environment
 .env
-
-# Virtual environments
 .venv/
 
 # IDE
@@ -15,8 +13,10 @@
 # Python
 __pycache__/
 
-# Pytest cache
-.pytest_cache/
-
 # Data
 data/
+datasets/
+
+# Mlflow
+mlruns/
+mlflow.db
