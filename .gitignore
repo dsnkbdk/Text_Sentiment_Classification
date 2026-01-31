@@ -20,3 +20,4 @@ datasets/
 # Mlflow
 mlruns/
 mlflow.db
+mlartifacts/
