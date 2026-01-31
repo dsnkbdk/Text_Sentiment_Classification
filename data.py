@@ -1,4 +1,4 @@
-import json
+import ast
 import logging
 import kagglehub
 import pandas as pd
@@ -25,7 +25,10 @@ def data_ingestion(dataset: str, file_name: str) -> pd.DataFrame:
 
 def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    
+
+    # Convert date
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+
     # Mandatory columns
     missing_mandatory = df[["date", "sentiment", "source", "subject"]].isna().any(axis=1)
     
@@ -39,8 +42,21 @@ def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(f"Dropping {invalid_rows.sum()} rows due to missing values")
         df = df.loc[~invalid_rows].reset_index(drop=True)
 
-    # Extract sentiment class
-    df["class"] = df["sentiment"].apply(lambda x: json.loads(x.replace("'", '"')).get("class"))
+    # Extract sentiment field
+    def parse_sentiment(x):
+        if not isinstance(x, str):
+            return {}
+        try:
+            field = ast.literal_eval(x)
+            return field if isinstance(field, dict) else {}
+        except Exception:
+            return {}
+    
+    sentiment = df["sentiment"].apply(parse_sentiment)
+
+    df["class"] = sentiment.apply(lambda x: x.get("class"))
+    df["polarity"] = pd.to_numeric(sentiment.apply(lambda x: x.get("polarity")), errors="coerce")
+    df["subjectivity"] = pd.to_numeric(sentiment.apply(lambda x: x.get("subjectivity")), errors="coerce")
 
     # Drop invalid class
     invalid_class = df["class"].isna() | ~df["class"].isin({"negative", "neutral", "positive"})
@@ -59,6 +75,10 @@ def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def get_clean_data(dataset: str, file_name: str) -> pd.DataFrame:
+    return data_cleaning(data_ingestion(dataset, file_name))
+
+
 def data_preparation(
     dataset: str,
     file_name: str,
@@ -66,7 +86,7 @@ def data_preparation(
     test_size: float=0.25
 ) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
     
-    df = data_cleaning(data_ingestion(dataset, file_name))
+    df = get_clean_data(dataset, file_name)
     X, y = df["title_text"], df["class"]
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
