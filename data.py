@@ -3,7 +3,6 @@ import logging
 import kagglehub
 import pandas as pd
 from pathlib import Path
-from dotenv import load_dotenv
 from sklearn.model_selection import train_test_split
 
 logger = logging.getLogger(__name__)
@@ -80,3 +79,26 @@ def data_preparation(
 
     return X_train, X_test, y_train, y_test
 
+
+if __name__ == '__main__':
+
+    from dotenv import load_dotenv
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s][%(levelname)s][%(name)s]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    
+    load_dotenv()
+    RANDOM_STATE = 2026
+    
+    try:
+        X_train, X_test, y_train, y_test = data_preparation(
+            dataset="oliviervha/crypto-news",
+            file_name="cryptonews.csv",
+            random_state=RANDOM_STATE
+        )
+    except Exception:
+        logger.exception("Smoke test failed")
+        raise

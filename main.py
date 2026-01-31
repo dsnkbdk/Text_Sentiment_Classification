@@ -1,162 +1,80 @@
 import os
-import json
+import sys
 import logging
-import mimetypes
-from openai import OpenAI
 from dotenv import load_dotenv
-from video_transcript import video_transcript
-from object_detection import object_detection
-from sentiment_analysis import sentiment_analysis
-from question_answer import question_answer
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+from data import data_preparation
+from model import logistic_regression
+from mlops import model_workflow
+
 logger = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
+# Config
+DATASET = "oliviervha/crypto-news"
+FILE_NAME = "cryptonews.csv"
+RANDOM_STATE = 2026
 
-def load_env() -> tuple[str, str]:
-    """
-    This function loads the `.env` file from the current working directory (if present),
-    retrieves the OpenAI API key and video file path from the environment, and performs
-    validation checks.
+EXPERIMENT_NAME = "Sentiment_Logistic_Regression"
+RUN_NAME_PREFIX = "logreg_gridsearch"
+REGISTERED_MODEL_NAME = "TFIDF_Logistic_Regression"
+
+PARAM_GRID = {
+    "tfidf__ngram_range": [(1, 1), (1, 2)],
+    "tfidf__max_df": [0.8, 0.9],
+    "tfidf__min_df": [5, 10],
+    "clf__max_iter": [200, 500]
+}
+
+def config_logging() -> None:
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s][%(levelname)s][%(name)s]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+def run_workflow() -> None:
+
+    # Data
+    X_train, X_test, y_train, y_test = data_preparation(
+        dataset=DATASET,
+        file_name=FILE_NAME,
+        random_state=RANDOM_STATE
+    )
+
+    # Model
+    model_workflow(
+        experiment_name=EXPERIMENT_NAME,
+        run_name_prefix=RUN_NAME_PREFIX,
+        Classifier=logistic_regression,
+        registered_model_name=REGISTERED_MODEL_NAME,
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
+        param_grid=PARAM_GRID,
+        random_state=RANDOM_STATE
+    )
+
+def main() -> int:
     
-    Returns:
-        tuple[str, str]: A tuple containing:
-            - api_key (str): The OpenAI API key for authentication.
-            - video_path (str): The path of the video file to be processed.
-
-    Raises:
-        RuntimeError: If `OPENAI_API_KEY` or `VIDEO_PATH` is missing.
-        FileNotFoundError: If the specified video file does not exist.
-        ValueError: If the file type is unsupported.
-    """
-
-    # Load .env
     load_dotenv()
+    config_logging()
 
-    # Load and validate api key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing OPENAI_API_KEY. Check `.env` file or environment variables")
-
-    # Load and validate video path
-    video_path = os.getenv("VIDEO_PATH")
-    if not video_path:
-        raise RuntimeError("Missing VIDEO_PATH. Check `.env` file or environment variables")
-    if not os.path.exists(video_path):
-        raise FileNotFoundError(f"Video file not found: {video_path}")
-
-    # Check file type
-    mime_type, _ = mimetypes.guess_type(video_path)
-    if not mime_type or not mime_type.startswith("video/"):
-        raise ValueError(f"Unsupported file type: {mime_type}")
-    
-    return api_key, video_path
-
-
-def openai_pipeline(api_key: str, video_path: str) -> dict:
-    """
-    This function orchestrates the complete video parsing pipeline.
-    Each stage is executed sequentially and logged for traceability.
-    
-    Args:
-        api_key (str): The OpenAI API key for authentication.
-        video_path (str): The path of the video file to be processed.
-    
-    Returns:
-        dict: A dictionary with the following structure:
-            {
-                "Transcription": <str>,    # Video's complete Transcription
-                "Objects": <list[str]>,    # As many Objects detected in video
-                "Mode and sentiment": {    # The over all mode and sentiment of the video
-                    "mode": <str>,
-                    "sentiment": <str>,
-                    "explanation": <str>
-                },
-                "Q&A pairs": [             # Convert video's transcript to list of QA pairs about the video
-                    {"Q": <str>, "A": <str>},
-                    ...
-                ]
-            }
-    Raises:
-        Exception: Propagates any unexpected error that occurs during execution.
-    """
-    
-    # Initialise the client
-    client = OpenAI(api_key=api_key)
+    mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    logger.info(f"MLFLOW_TRACKING_URI is {mlflow_tracking_uri}")
 
     try:
-        # Get the complete transcription
-        transcription = video_transcript(client=client, video_path=video_path, model="whisper-1")
-        logger.info("Transcription is complete")
-
-        # Detect objects in the video
-        objects = object_detection(client=client, video_path=video_path, model="gpt-4.1", sample_rate=0.5)
-        logger.info("Object detection is complete")
-
-        # Analyse the mode and sentiment of the video
-        mode_sentiment = sentiment_analysis(client=client, transcription=transcription, model="gpt-4.1")
-        logger.info("Mode and sentiment analysis are complete")
-
-        # Generate Q&A pairs
-        qa_pairs = question_answer(client=client, transcription=transcription, model="gpt-4.1")
-        logger.info("Q&A pairs generation is complete")
-
+        run_workflow()
+        logger.info("Workflow finished successfully")
+        return 0
+    except KeyboardInterrupt:
+        logger.warning("Interrupted by user")
+        return 130
     except Exception:
-        logger.exception("Unexpected error occurred while parsing video")
-        raise
-
-    try:
-        # Merge and format output
-        merge_output = {
-            "Transcription": transcription,
-            "Objects": json.loads(objects).get("objects", []),
-            "Mode and sentiment": json.loads(mode_sentiment),
-            "Q&A pairs": json.loads(qa_pairs).get("QA_pairs", [])
-        }
-
-    except Exception:
-        logger.exception("Unexpected error occurred while merging and formatting output")
-        raise
-
-    return merge_output
-
-
-def main():
-    """
-    Main entry point for execution.
-    The function serves as the top-level orchestration layer,
-    all lower-level exceptions are propagated upward and logged here.
-    
-    Logging:
-        - INFO: Prints the final formatted JSON output.
-        - EXCEPTION: Captures full traceback information if a fatal error occurs.
-    
-    Raises:
-        Exception: Any unexpected error that occurs during execution.
-    
-    Example:
-        >>> if __name__ == "__main__":
-        ...     main()
-    """
-    
-    try:
-        api_key, video_path = load_env()
-        merge_output = openai_pipeline(api_key, video_path)
-        
-        # Format JSON output
-        json_output = json.dumps(merge_output, indent=4, ensure_ascii=False).replace(',\n    "', ',\n\n    "')
-        logger.info(f"\n{json_output}")
-
-    except Exception:
-        logger.exception("Fatal Error: Execution terminated unexpectedly.")
-
-
+        logger.exception("Workflow failed")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

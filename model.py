@@ -20,8 +20,7 @@ def logistic_regression(
         ("tfidf", TfidfVectorizer()),
         ("clf", LogisticRegression(
             class_weight="balanced",
-            random_state=random_state,
-            n_jobs=-1
+            random_state=random_state
         ))
     ])
 
@@ -37,7 +36,6 @@ def logistic_regression(
         estimator=pipe,
         param_grid=param_grid,
         scoring=scoring,
-        n_jobs=-1,
         cv=cv
     )
 

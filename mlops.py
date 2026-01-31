@@ -106,3 +106,50 @@ def model_workflow(
             candidate_version=model_info.registered_model_version,
             candidate_f1_score=test_f1_score
         )
+
+
+if __name__ == '__main__':
+
+    from dotenv import load_dotenv
+    from data import data_preparation
+    from model import logistic_regression
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s][%(levelname)s][%(name)s]: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    
+    load_dotenv()
+    RANDOM_STATE = 2026
+    REGISTERED_MODEL_NAME = "TFIDF_Logistic_Regression"
+    
+    param_grid = {
+        "tfidf__ngram_range": [(1, 1), (1, 2)],
+        "tfidf__max_df": [0.8, 0.9],
+        "tfidf__min_df": [5, 10],
+        "clf__max_iter": [200, 500]
+    }
+    
+    try:
+        X_train, X_test, y_train, y_test = data_preparation(
+            dataset="oliviervha/crypto-news",
+            file_name="cryptonews.csv",
+            random_state=RANDOM_STATE
+        )
+        
+        model_workflow(
+            experiment_name="Sentiment_Logistic_Regression",
+            run_name_prefix="logreg_gridsearch",
+            Classifier=logistic_regression,
+            registered_model_name=REGISTERED_MODEL_NAME,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            param_grid=param_grid,
+            random_state=RANDOM_STATE
+        )
+    except Exception:
+        logger.exception("Smoke test failed")
+        raise
