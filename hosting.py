@@ -2,7 +2,6 @@ import os
 import time
 import mlflow
 import logging
-import pandas as pd
 from dotenv import load_dotenv
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
@@ -20,11 +19,11 @@ logger = logging.getLogger(__name__)
 SentimentLabel = Literal["negative", "neutral", "positive"]
 
 class PredictRequest(BaseModel):
-    text: str = Field(
+    input_text: str = Field(
         ...,
         min_length=1,
-        description="Crypto news text for sentiment classification (title + text)",
-        examples=["Bitcoin price surges after ETF approval"]
+        description="Crypto news text for sentiment classification",
+        examples=["Bitcoin rallies sharply after ETF approval, igniting strong investor enthusiasm."]
     )
 
 class PredictResponse(BaseModel):
@@ -130,18 +129,18 @@ def fast_api(
     async def predict(req: PredictRequest):
 
         # Avoid empty text such as "    "
-        text = req.text.strip()
+        input_text = req.input_text.strip()
 
-        if not text:
-            raise HTTPException(status_code=400, detail="Field 'text' is required")
+        if not input_text:
+            raise HTTPException(status_code=400, detail="Field 'input_text' is required")
         
-        logger.info(f"Predict request received (chars={len(text)})")
+        logger.info(f"Predict request received (chars={len(input_text)})")
         
         start = time.perf_counter()
 
         # MLflow signature expects list/Series
         try:
-            pred = model.predict([text])
+            pred = model.predict([input_text])
         except Exception as e:
             raise HTTPException(status_code=503, detail=f"Model prediction failed: {e}") from e
         

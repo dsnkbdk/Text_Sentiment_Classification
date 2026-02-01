@@ -52,7 +52,7 @@ c1, c2, c3 = st.columns(3)
 
 # Define button behavior
 if c1.button("Positive sample", width="stretch"):
-    st.session_state["input_text"] = "Bitcoin price surges after ETF approval, and market optimism rises."
+    st.session_state["input_text"] = "Bitcoin rallies sharply after ETF approval, igniting strong investor enthusiasm."
 
 if c2.button("Neutral sample", width="stretch"):
     st.session_state["input_text"] = "Ethereum trades sideways as investors await macroeconomic data."
@@ -61,14 +61,14 @@ if c3.button("Negative sample", width="stretch"):
     st.session_state["input_text"] = "Crypto prices plunge after exchange hack fears spark panic and heavy regulation."
 
 # Input text
-text = st.text_area(
+input_text = st.text_area(
     "Input text",
     height=200,
-    placeholder="Paste a crypto news title/text here...",
+    placeholder="Paste a crypto news here...",
     key="input_text"
 )
 
-payload = {"text": text.strip()}
+payload = {"input_text": input_text.strip()}
 
 # Preview
 with st.expander("Request JSON preview"):
@@ -84,7 +84,7 @@ predict = left_button.button("Predict", type="primary", width="stretch")
 
 # Define button behavior
 if predict:
-    if not text.strip():
+    if not input_text.strip():
         st.warning("Please enter some text")
     else:
         try:

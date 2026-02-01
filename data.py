@@ -66,11 +66,11 @@ def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
         df = df.loc[~invalid_class].reset_index(drop=True)
 
     # Class distribution
-    logger.info(f"Class distribution (count):\n{df["class"].value_counts().to_string()}")
-    logger.info(f"Class distribution (ratio):\n{df["class"].value_counts(normalize=True).to_string()}")
+    logger.info(f"Class distribution (count):\n{df['class'].value_counts().to_string()}")
+    logger.info(f"Class distribution (ratio):\n{df['class'].value_counts(normalize=True).to_string()}")
 
     # Build title + text feature
-    df["title_text"] = (df["title"].fillna("") + ". " + df["text"].fillna("")).str.lstrip(". ")
+    df["input_text"] = (df["title"].fillna("") + ". " + df["text"].fillna("")).str.lstrip(". ")
 
     return df
 
@@ -87,7 +87,7 @@ def data_preparation(
 ) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
     
     df = get_clean_data(dataset, file_name)
-    X, y = df["title_text"], df["class"]
+    X, y = df["input_text"], df["class"]
     X_train, X_test, y_train, y_test = train_test_split(
         X, y,
         test_size=test_size,

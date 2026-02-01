@@ -168,8 +168,8 @@ if selected:
     c2.metric("Negative share", f"{analysis_df['class'].eq('negative').mean():.1%}")
     c3.metric("Neutral share", f"{analysis_df['class'].eq('neutral').mean():.1%}")
     c4.metric("Positive share", f"{analysis_df['class'].eq('positive').mean():.1%}")
-    c5.metric("Avg polarity", f"{analysis_df["polarity"].mean():.3f}")
-    c6.metric("Avg subjectivity", f"{analysis_df["subjectivity"].mean():.3f}")
+    c5.metric("Avg polarity", f"{analysis_df['polarity'].mean():.3f}")
+    c6.metric("Avg subjectivity", f"{analysis_df['subjectivity'].mean():.3f}")
 
     # Distribution
     dist = analysis_df["class"].value_counts().reset_index()
