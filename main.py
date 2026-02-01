@@ -38,14 +38,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Training pipeline for sentiment classification"
     )
-    parser.add_argument(
-        "--random-state",
-        type=int,
-        default=RANDOM_STATE
-    )
+    parser.add_argument("--random-state", type=int, default=RANDOM_STATE)
+    parser.add_argument("--experiment-name", type=str, default=EXPERIMENT_NAME)
+    parser.add_argument("--run-name-prefix", type=str, default=RUN_NAME_PREFIX)
+    parser.add_argument("--registered-model-name", type=str, default=REGISTERED_MODEL_NAME)
     return parser.parse_args()
 
-def run_workflow(random_state: int) -> None:
+def run_workflow(
+    random_state: int,
+    experiment_name: str,
+    run_name_prefix: str,
+    registered_model_name: str
+) -> None:
 
     # Data
     X_train, X_test, y_train, y_test = data_preparation(
@@ -56,10 +60,10 @@ def run_workflow(random_state: int) -> None:
 
     # Model
     model_workflow(
-        experiment_name=EXPERIMENT_NAME,
-        run_name_prefix=RUN_NAME_PREFIX,
-        Classifier=logistic_regression,
-        registered_model_name=REGISTERED_MODEL_NAME,
+        experiment_name=experiment_name,
+        run_name_prefix=run_name_prefix,
+        classifier=logistic_regression,
+        registered_model_name=registered_model_name,
         X_train=X_train,
         X_test=X_test,
         y_train=y_train,
@@ -75,14 +79,28 @@ def main() -> int:
 
     args = parse_args()
     random_state = args.random_state
+    experiment_name = args.experiment_name
+    run_name_prefix = args.run_name_prefix
+    registered_model_name = args.registered_model_name
     
-    logger.info(f"Using random_state = {random_state}")
+    logger.info(f"""This experiment is running with:
+random_state = {random_state}
+experiment_name = {experiment_name}
+run_name_prefix = {run_name_prefix}
+registered_model_name = {registered_model_name}
+"""
+    )
 
     mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
     logger.info(f"MLFLOW_TRACKING_URI is {mlflow_tracking_uri}")
 
     try:
-        run_workflow(random_state=random_state)
+        run_workflow(
+            random_state=random_state,
+            experiment_name=experiment_name,
+            run_name_prefix=run_name_prefix,
+            registered_model_name=registered_model_name
+        )
         logger.info("Workflow finished successfully")
         return 0
     except KeyboardInterrupt:

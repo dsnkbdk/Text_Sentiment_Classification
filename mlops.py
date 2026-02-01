@@ -51,7 +51,7 @@ def model_workflow(
     *,
     experiment_name: str,
     run_name_prefix: str,
-    Classifier: callable,
+    classifier: callable,
     registered_model_name: str,
     X_train,
     X_test,
@@ -72,7 +72,7 @@ def model_workflow(
         # Fitting
         logger.info("Start fitting the model")
 
-        clf = Classifier(
+        clf = classifier(
             X_train=X_train,
             y_train=y_train,
             param_grid=param_grid,
@@ -141,7 +141,7 @@ if __name__ == '__main__':
         model_workflow(
             experiment_name="Sentiment_Logistic_Regression",
             run_name_prefix="logreg_gridsearch",
-            Classifier=logistic_regression,
+            classifier=logistic_regression,
             registered_model_name=REGISTERED_MODEL_NAME,
             X_train=X_train,
             X_test=X_test,
