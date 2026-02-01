@@ -167,4 +167,4 @@ load_dotenv()
 
 app = fast_api(
     mlflow_tracking_uri=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"),
-    registered_model_name="TF-IDF Logistic Regression")
+    registered_model_name="TFIDF_Logistic_Regression")

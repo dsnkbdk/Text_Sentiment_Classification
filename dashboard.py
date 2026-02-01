@@ -3,6 +3,7 @@ import streamlit as st
 import plotly.express as px
 from data import get_clean_data
 
+st.set_page_config(page_title="Crypto News Sentiment Dashboard", layout="wide")
 st.title("Crypto News Sentiment Dashboard")
 
 @st.cache_data
@@ -49,23 +50,26 @@ def subjectivity_mean_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
 # Load clean data
 df = get_clean_data("oliviervha/crypto-news", "cryptonews.csv")
 
-# Sidebar filters
+# Sidebar settings
+# Filters
 st.sidebar.header("Filters")
 
+# Date range
 min_date = df["date"].min().date()
 max_date = df["date"].max().date()
 
 date_range = st.sidebar.date_input(
-    "Date range",
+    label="Date range",
     value=(min_date, max_date),
     min_value=min_date,
     max_value=max_date
 )
 
+# Time granularity
 freq = st.sidebar.selectbox(
-    "Time granularity",
+    label="Time granularity",
     options=["Daily", "Weekly", "Monthly", "Yearly"],
-    index=1
+    index=0
 )
 
 freq_map = {
@@ -75,111 +79,119 @@ freq_map = {
     "Yearly": "YE"
 }
 
-freq_code = freq_map[freq]
-
+# Source & Subject
 sources = st.sidebar.multiselect("Source", sorted(df["source"].unique()))
 subjects = st.sidebar.multiselect("Subject", sorted(df["subject"].unique()))
 
-st.sidebar.header("Trend settings")
+# Trends
+st.sidebar.header("Trends")
 
 trend_metric = st.sidebar.radio(
-    "Trend metric",
-    options=["Share (stacked)", "Count (stacked)", "Polarity mean (line)"],
+    label="Trend metric",
+    options=[
+        "Share (Stacked)",
+        "Count (Stacked)",
+        "Polarity mean (Line)",
+        "Subjectivity mean (Line)"
+    ],
     index=0
 )
 
-
-
+# Filter out a subset based on date range
 start = pd.to_datetime(date_range[0])
 end = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1)
 
 mask = (df["date"] >= start) & (df["date"] < end)
+
 if sources:
     mask &= df["source"].isin(sources)
 if subjects:
     mask &= df["subject"].isin(subjects)
 
-fdf = df.loc[mask].copy()
+sub_df = df.loc[mask].copy()
 
-# KPI row
+# Main page settings
+# KPI section
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Rows", f"{len(fdf):,}")
-c2.metric("Sources", f"{fdf['source'].nunique():,}")
-c3.metric("Subjects", f"{fdf['subject'].nunique():,}")
-c4.metric("Avg polarity", f"{pd.to_numeric(fdf['polarity'], errors='coerce').mean():.3f}")
-c5.metric("Avg subjectivity", f"{pd.to_numeric(fdf['subjectivity'], errors='coerce').mean():.3f}")
+c1.metric("Rows", f"{len(sub_df)}")
+c2.metric("Sources", f"{sub_df['source'].nunique()}")
+c3.metric("Subjects", f"{sub_df['subject'].nunique():,}")
+c4.metric("Avg polarity", f"{sub_df['polarity'].mean():.3f}")
+c5.metric("Avg subjectivity", f"{sub_df['subjectivity'].mean():.3f}")
 
 st.divider()
 
-# Trend (share over time)
+# Trend section
 st.subheader("Trend over time")
 
-if trend_metric == "Share (stacked)":
-    trend = sentiment_share_over_time(fdf, freq=freq_code)
+if trend_metric == "Share (Stacked)":
+    trend = sentiment_share_over_time(sub_df, freq=freq_map[freq])
     fig_trend = px.area(trend, x="date", y="share", color="class")
     fig_trend.update_yaxes(tickformat=".0%")
-    st.plotly_chart(fig_trend, width='stretch')
+    st.plotly_chart(fig_trend)
 
-elif trend_metric == "Count (stacked)":
-    trend = sentiment_count_over_time(fdf, freq=freq_code)
+elif trend_metric == "Count (Stacked)":
+    trend = sentiment_count_over_time(sub_df, freq=freq_map[freq])
     fig_trend = px.area(trend, x="date", y="count", color="class")
-    st.plotly_chart(fig_trend, width='stretch')
+    st.plotly_chart(fig_trend)
 
-else:  # Polarity mean (line)
-    trend = polarity_mean_over_time(fdf, freq=freq_code)
+elif trend_metric == "Polarity mean (Line)":
+    trend = polarity_mean_over_time(sub_df, freq=freq_map[freq])
     fig_trend = px.line(trend, x="date", y="polarity_mean")
-    st.plotly_chart(fig_trend, width='stretch')
+    st.plotly_chart(fig_trend)
+
+elif trend_metric == "Subjectivity mean (Line)":
+    trend = subjectivity_mean_over_time(sub_df, freq=freq_map[freq])
+    fig_trend = px.line(trend, x="date", y="subjectivity_mean")
+    st.plotly_chart(fig_trend)
 
 st.divider()
 
-# Breakdown charts
-left, right = st.columns(2)
+# Breakdown bar charts
+left_source, right_subject = st.columns(2)
 
-with left:
-    st.subheader("Sentiment distribution by source (Top 15 by volume)")
-    top_sources = fdf["source"].value_counts().head(15).index
-    tmp = fdf[fdf["source"].isin(top_sources)]
-    fig_source = px.histogram(tmp, x="source", color="class", barmode="group")
-    st.plotly_chart(fig_source, width='stretch')
+with left_source:
+    st.subheader("Sentiment distribution by source")
+    fig_source = px.histogram(sub_df, x="source", color="class", barmode="group")
+    st.plotly_chart(fig_source)
 
-with right:
-    st.subheader("Sentiment distribution by subject (Top 15 by volume)")
-    top_subjects = fdf["subject"].value_counts().head(15).index
-    tmp2 = fdf[fdf["subject"].isin(top_subjects)]
-    fig_subject = px.histogram(tmp2, x="subject", color="class", barmode="group")
-    st.plotly_chart(fig_subject, width='stretch')
-
-
-
-
+with right_subject:
+    st.subheader("Sentiment distribution by subject")
+    fig_subject = px.histogram(sub_df, x="subject", color="class", barmode="group")
+    st.plotly_chart(fig_subject)
 
 st.divider()
-st.subheader("Drill-down")
 
-drill_mode = st.radio("Drill by", options=["source", "subject"], horizontal=True)
-if drill_mode == "source":
-    options = top_source_tbl["source"].tolist() if len(top_source_tbl) else []
-else:
-    options = top_subject_tbl["subject"].tolist() if len(top_subject_tbl) else []
+st.subheader("Deep dive")
 
-selected = st.selectbox(f"Select a {drill_mode}", options=options)
+deep_mode = st.radio("Deep dive by", options=["source", "subject"], horizontal=True)
+selected = st.selectbox(
+    label=f"Select a {deep_mode}",
+    options=sorted(sub_df[deep_mode].unique().tolist())
+)
 
 if selected:
-    ddf = fdf[fdf[drill_mode] == selected].copy()
+    deep_df = sub_df[sub_df[deep_mode] == selected].copy()
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Rows", f"{len(ddf):,}")
-    c2.metric("Negative share", f"{(ddf['class'].eq('negative').mean() if len(ddf) else 0):.1%}")
-    c3.metric("Avg polarity", f"{pd.to_numeric(ddf['polarity'], errors='coerce').mean():.3f}")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1.metric("Rows", f"{len(deep_df)}")
+    c2.metric("Negative share", f"{deep_df['class'].eq('negative').mean():.1%}")
+    c3.metric("Neutral share", f"{deep_df['class'].eq('neutral').mean():.1%}")
+    c4.metric("Positive share", f"{deep_df['class'].eq('positive').mean():.1%}")
+    c5.metric("Avg polarity", f"{deep_df["polarity"].mean():.3f}")
+    c6.metric("Avg subjectivity", f"{deep_df["subjectivity"].mean():.3f}")
 
-    # distribution
-    dist = ddf["class"].value_counts().reset_index()
+    # Distribution
+    dist = deep_df["class"].value_counts().reset_index()
     dist.columns = ["class", "count"]
     fig = px.bar(dist, x="class", y="count")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig)
 
-    # latest news samples
-    st.markdown("### Latest samples")
-    show_n = st.slider("Show latest N", 5, 50, 15)
-    cols = [c for c in ["date", "source", "subject", "class", "polarity", "title", "url"] if c in ddf.columns]
-    st.dataframe(ddf.sort_values("date", ascending=False)[cols].head(show_n), width='stretch')
+    st.divider()
+
+    # Latest news samples
+    st.subheader("Latest samples")
+
+    sample_n = st.slider("Show the latest N news", 10, 100, 50)
+    cols = [c for c in ["date", "source", "subject", "class", "title", "text", "url"] if c in deep_df.columns]
+    st.dataframe(deep_df.sort_values("date", ascending=False)[cols].head(sample_n))
