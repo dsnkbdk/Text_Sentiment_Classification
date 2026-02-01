@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import argparse
 from dotenv import load_dotenv
 
 from data import data_preparation
@@ -26,20 +27,31 @@ PARAM_GRID = {
 }
 
 def config_logging() -> None:
-
     logging.basicConfig(
         level=logging.INFO,
         format="[%(asctime)s][%(levelname)s][%(name)s]: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
+        force=True
     )
 
-def run_workflow() -> None:
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Training pipeline for sentiment classification"
+    )
+    parser.add_argument(
+        "--random-state",
+        type=int,
+        default=RANDOM_STATE
+    )
+    return parser.parse_args()
+
+def run_workflow(random_state: int) -> None:
 
     # Data
     X_train, X_test, y_train, y_test = data_preparation(
         dataset=DATASET,
         file_name=FILE_NAME,
-        random_state=RANDOM_STATE
+        random_state=random_state
     )
 
     # Model
@@ -53,7 +65,7 @@ def run_workflow() -> None:
         y_train=y_train,
         y_test=y_test,
         param_grid=PARAM_GRID,
-        random_state=RANDOM_STATE
+        random_state=random_state
     )
 
 def main() -> int:
@@ -61,11 +73,16 @@ def main() -> int:
     load_dotenv()
     config_logging()
 
+    args = parse_args()
+    random_state = args.random_state
+    
+    logger.info(f"Using random_state = {random_state}")
+
     mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
     logger.info(f"MLFLOW_TRACKING_URI is {mlflow_tracking_uri}")
 
     try:
-        run_workflow()
+        run_workflow(random_state=random_state)
         logger.info("Workflow finished successfully")
         return 0
     except KeyboardInterrupt:

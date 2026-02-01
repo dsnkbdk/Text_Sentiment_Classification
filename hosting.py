@@ -60,7 +60,7 @@ def fast_api(
     logger.info(f"Loading prod model from {model_uri}")
     
     try:
-        model = mlflow.pyfunc.load_model(model_uri)
+        model = mlflow.sklearn.load_model(model_uri)
     except Exception as e:
         raise RuntimeError(f"Failed to load model from '{model_uri}': {e}") from e
 
@@ -139,9 +139,9 @@ def fast_api(
         
         start = time.perf_counter()
 
-        # MLflow signature expects a DataFrame with column 'title_text'
+        # MLflow signature expects list/Series
         try:
-            pred = model.predict(pd.DataFrame({"title_text": [text]}))
+            pred = model.predict([text])
         except Exception as e:
             raise HTTPException(status_code=503, detail=f"Model prediction failed: {e}") from e
         
