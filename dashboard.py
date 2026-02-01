@@ -4,9 +4,7 @@ import plotly.express as px
 from data import get_clean_data
 
 st.set_page_config(page_title="Crypto News Sentiment Dashboard", layout="wide")
-st.title("Crypto News Sentiment Dashboard")
-
-@st.cache_data
+st.title("Crypto News Sentiment Dashboard", text_alignment="center")
 
 # Count sentiment labels over time
 def sentiment_count_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
@@ -48,7 +46,7 @@ def subjectivity_mean_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
 
 
 # Load clean data
-df = get_clean_data("oliviervha/crypto-news", "cryptonews.csv")
+df = st.cache_data()(get_clean_data)("oliviervha/crypto-news", "cryptonews.csv")
 
 # Sidebar settings
 # Filters
@@ -151,27 +149,28 @@ st.divider()
 left_source, right_subject = st.columns(2)
 
 with left_source:
-    st.subheader("Sentiment distribution by source")
+    st.subheader("Sentiment distribution by source", text_alignment="center")
     fig_source = px.histogram(sub_df, x="source", color="class", barmode="group")
     st.plotly_chart(fig_source)
 
 with right_subject:
-    st.subheader("Sentiment distribution by subject")
+    st.subheader("Sentiment distribution by subject", text_alignment="center")
     fig_subject = px.histogram(sub_df, x="subject", color="class", barmode="group")
     st.plotly_chart(fig_subject)
 
 st.divider()
 
-st.subheader("Deep dive")
+st.subheader("Further Analysis")
 
-deep_mode = st.radio("Deep dive by", options=["source", "subject"], horizontal=True)
-selected = st.selectbox(
-    label=f"Select a {deep_mode}",
-    options=sorted(sub_df[deep_mode].unique().tolist())
+analysis_mode = st.radio("Analysis by", options=["source", "subject"], horizontal=True)
+selected = st.radio(
+    label=f"Select a {analysis_mode}",
+    options=sorted(sub_df[analysis_mode].unique().tolist()),
+    horizontal=True
 )
 
 if selected:
-    deep_df = sub_df[sub_df[deep_mode] == selected].copy()
+    deep_df = sub_df[sub_df[analysis_mode] == selected].copy()
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Rows", f"{len(deep_df)}")
