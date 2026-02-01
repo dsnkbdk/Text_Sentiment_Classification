@@ -3,17 +3,15 @@ import streamlit as st
 import plotly.express as px
 from data import get_clean_data
 
-st.set_page_config(page_title="Crypto News Sentiment Dashboard", layout="wide")
 st.title("Crypto News Sentiment Dashboard", text_alignment="center")
 
 # Count sentiment labels over time
 def sentiment_count_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
-    group = (
+    return (
         df.groupby([pd.Grouper(key="date", freq=freq), "class"])
         .size()
         .reset_index(name="count")
     )
-    return group
 
 # Calculate sentiment share over time
 def sentiment_share_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
@@ -28,21 +26,19 @@ def sentiment_share_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
 
 # Calculate mean polarity score over time
 def polarity_mean_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
-    group = (
+    return (
         df.groupby(pd.Grouper(key="date", freq=freq))["polarity"]
         .mean()
         .reset_index(name="polarity_mean")
     )
-    return group
 
 # Calculate mean subjectivity score over time
 def subjectivity_mean_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
-    group = (
+    return (
         df.groupby(pd.Grouper(key="date", freq=freq))["subjectivity"]
         .mean()
         .reset_index(name="subjectivity_mean")
     )
-    return group
 
 
 # Load clean data
@@ -70,12 +66,7 @@ freq = st.sidebar.selectbox(
     index=0
 )
 
-freq_map = {
-    "Daily": "D",
-    "Weekly": "W",
-    "Monthly": "ME",
-    "Yearly": "YE"
-}
+freq_map = {"Daily": "D", "Weekly": "W", "Monthly": "ME", "Yearly": "YE"}
 
 # Source & Subject
 sources = st.sidebar.multiselect("Source", sorted(df["source"].unique()))
@@ -170,18 +161,18 @@ selected = st.radio(
 )
 
 if selected:
-    deep_df = sub_df[sub_df[analysis_mode] == selected].copy()
+    analysis_df = sub_df[sub_df[analysis_mode] == selected].copy()
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Rows", f"{len(deep_df)}")
-    c2.metric("Negative share", f"{deep_df['class'].eq('negative').mean():.1%}")
-    c3.metric("Neutral share", f"{deep_df['class'].eq('neutral').mean():.1%}")
-    c4.metric("Positive share", f"{deep_df['class'].eq('positive').mean():.1%}")
-    c5.metric("Avg polarity", f"{deep_df["polarity"].mean():.3f}")
-    c6.metric("Avg subjectivity", f"{deep_df["subjectivity"].mean():.3f}")
+    c1.metric("Rows", f"{len(analysis_df)}")
+    c2.metric("Negative share", f"{analysis_df['class'].eq('negative').mean():.1%}")
+    c3.metric("Neutral share", f"{analysis_df['class'].eq('neutral').mean():.1%}")
+    c4.metric("Positive share", f"{analysis_df['class'].eq('positive').mean():.1%}")
+    c5.metric("Avg polarity", f"{analysis_df["polarity"].mean():.3f}")
+    c6.metric("Avg subjectivity", f"{analysis_df["subjectivity"].mean():.3f}")
 
     # Distribution
-    dist = deep_df["class"].value_counts().reset_index()
+    dist = analysis_df["class"].value_counts().reset_index()
     dist.columns = ["class", "count"]
     fig = px.bar(dist, x="class", y="count")
     st.plotly_chart(fig)
@@ -192,5 +183,5 @@ if selected:
     st.subheader("Latest samples")
 
     sample_n = st.slider("Show the latest N news", 10, 100, 50)
-    cols = [c for c in ["date", "source", "subject", "class", "title", "text", "url"] if c in deep_df.columns]
-    st.dataframe(deep_df.sort_values("date", ascending=False)[cols].head(sample_n))
+    cols = [c for c in ["date", "source", "subject", "class", "title", "text", "url"] if c in analysis_df.columns]
+    st.dataframe(analysis_df.sort_values("date", ascending=False)[cols].head(sample_n))

@@ -4,12 +4,10 @@ import requests
 import streamlit as st
 from dotenv import load_dotenv
 
-st.set_page_config(page_title="Sentiment Classification Model Serving UI", layout="wide")
-st.title("Sentiment Classification Model Serving UI", text_alignment="center")
-
 load_dotenv()
-
 FASTAPI_URI=os.getenv("FASTAPI_URI", "http://localhost:8000")
+
+st.title("Sentiment Classification Model Serving UI", text_alignment="center")
 
 # Connection
 st.subheader(f"API connection")
