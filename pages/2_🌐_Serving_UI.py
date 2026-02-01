@@ -52,13 +52,13 @@ c1, c2, c3 = st.columns(3)
 
 # Define button behavior
 if c1.button("Positive sample", width="stretch"):
-    st.session_state["input_text"] = "Bitcoin price surges after ETF approval and market optimism rises."
+    st.session_state["input_text"] = "Bitcoin price surges after ETF approval, and market optimism rises."
 
 if c2.button("Neutral sample", width="stretch"):
     st.session_state["input_text"] = "Ethereum trades sideways as investors await macroeconomic data."
 
 if c3.button("Negative sample", width="stretch"):
-    st.session_state["input_text"] = "Crypto market tumbles amid exchange hack fears and regulatory crackdown."
+    st.session_state["input_text"] = "Crypto prices plunge after exchange hack fears spark panic and heavy regulation."
 
 # Input text
 text = st.text_area(
