@@ -3,7 +3,24 @@ import streamlit as st
 import plotly.express as px
 from data import get_clean_data
 
+st.set_page_config(page_title="Crypto News Sentiment Dashboard", layout="wide")
 st.title("Crypto News Sentiment Dashboard", text_alignment="center")
+
+# Global settings
+st.markdown(
+    """
+    <style>
+    [data-testid="stMetricLabel"] {
+        display: block;
+        text-align: center;
+    }
+    [data-testid="stMetricValue"] {
+        text-align: center;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # Count sentiment labels over time
 def sentiment_count_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
@@ -52,11 +69,16 @@ st.sidebar.header("Filters")
 min_date = df["date"].min().date()
 max_date = df["date"].max().date()
 
+if st.sidebar.button("Reset date range", width="stretch"):
+    st.session_state["date_range"] = (min_date, max_date)
+    st.rerun()
+
 date_range = st.sidebar.date_input(
     label="Date range",
-    value=(min_date, max_date),
+    value=st.session_state.get("date_range", (min_date, max_date)),
     min_value=min_date,
-    max_value=max_date
+    max_value=max_date,
+    key="date_range"
 )
 
 # Time granularity
@@ -88,7 +110,7 @@ trend_metric = st.sidebar.radio(
 
 # Filter out a subset based on date range
 start = pd.to_datetime(date_range[0])
-end = pd.to_datetime(date_range[1]) + pd.Timedelta(days=1)
+end = pd.to_datetime(date_range[1] if len(date_range) == 2 else None) + pd.Timedelta(days=1)
 
 mask = (df["date"] >= start) & (df["date"] < end)
 
@@ -101,12 +123,21 @@ sub_df = df.loc[mask].copy()
 
 # Main page settings
 # KPI section
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Rows", f"{len(sub_df)}")
-c2.metric("Sources", f"{sub_df['source'].nunique()}")
-c3.metric("Subjects", f"{sub_df['subject'].nunique():,}")
-c4.metric("Avg polarity", f"{sub_df['polarity'].mean():.3f}")
-c5.metric("Avg subjectivity", f"{sub_df['subjectivity'].mean():.3f}")
+st.divider()
+
+row1 = st.columns(3)
+row1[0].metric("Rows", f"{len(sub_df)}")
+row1[1].metric("Sources", f"{sub_df['source'].nunique()}")
+row1[2].metric("Subjects", f"{sub_df['subject'].nunique():,}")
+
+st.divider()
+
+row2 = st.columns(5)
+row2[0].metric("Negative share", f"{sub_df['class'].eq('negative').mean():.1%}")
+row2[1].metric("Neutral share", f"{sub_df['class'].eq('neutral').mean():.1%}")
+row2[2].metric("Positive share", f"{sub_df['class'].eq('positive').mean():.1%}")
+row2[3].metric("Avg polarity", f"{sub_df['polarity'].mean():.3f}")
+row2[4].metric("Avg subjectivity", f"{sub_df['subjectivity'].mean():.3f}")
 
 st.divider()
 
