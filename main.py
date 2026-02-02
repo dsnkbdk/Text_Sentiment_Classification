@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from data import data_preparation
 from model import logistic_regression
-from mlops import model_workflow
+from mlops import ml_workflow, llm_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def run_workflow(
     )
 
     # Model
-    model_workflow(
+    ml_workflow(
         experiment_name=experiment_name,
         run_name_prefix=run_name_prefix,
         classifier=logistic_regression,

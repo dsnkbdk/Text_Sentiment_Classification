@@ -2,10 +2,12 @@ fastapi==0.128.0
 ipykernel==7.1.0
 kagglehub==0.4.1
 mlflow==3.8.1
+numpy==1.26.4
 pandas==2.3.3
 plotly==6.5.2
 python-dotenv==1.2.1
 scikit-learn==1.8.0
 streamlit==1.53.1
+torch==2.2.2
 transformers==5.0.0
 watchdog==6.0.0
