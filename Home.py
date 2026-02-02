@@ -21,9 +21,8 @@ st.divider()
 
 st.subheader("🏗️ System Architecture", text_alignment="center")
 
-img_row = st.columns([1, 2, 1])
-with img_row[1]:
-    st.image("assets/Architecture.png", width="stretch")
+with st.container(horizontal_alignment="center", vertical_alignment="center"):
+    st.image("assets/Architecture.png")
 
 st.markdown(
     """

@@ -22,6 +22,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+COLOR_MAP = {
+    "negative": "#1d76e3",
+    "neutral":  "#8bcafa",
+    "positive": "#fca09d",
+}
+
 # Count sentiment labels over time
 def sentiment_count_over_time(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     return (
@@ -146,23 +152,37 @@ st.subheader("Trend over time")
 
 if trend_metric == "Share (Stacked)":
     trend = sentiment_share_over_time(sub_df, freq=freq_map[freq])
-    fig_trend = px.area(trend, x="date", y="share", color="class")
+    fig_trend = px.area(
+        trend,
+        x="date",
+        y="share",
+        color="class",
+        color_discrete_map=COLOR_MAP
+    )
     fig_trend.update_yaxes(tickformat=".0%")
     st.plotly_chart(fig_trend)
 
 elif trend_metric == "Count (Stacked)":
     trend = sentiment_count_over_time(sub_df, freq=freq_map[freq])
-    fig_trend = px.area(trend, x="date", y="count", color="class")
+    fig_trend = px.area(
+        trend,
+        x="date",
+        y="count",
+        color="class",
+        color_discrete_map=COLOR_MAP
+    )
     st.plotly_chart(fig_trend)
 
 elif trend_metric == "Polarity mean (Line)":
     trend = polarity_mean_over_time(sub_df, freq=freq_map[freq])
     fig_trend = px.line(trend, x="date", y="polarity_mean")
+    fig_trend.update_traces(connectgaps=True)
     st.plotly_chart(fig_trend)
 
 elif trend_metric == "Subjectivity mean (Line)":
     trend = subjectivity_mean_over_time(sub_df, freq=freq_map[freq])
     fig_trend = px.line(trend, x="date", y="subjectivity_mean")
+    fig_trend.update_traces(connectgaps=True)
     st.plotly_chart(fig_trend)
 
 st.divider()
@@ -172,12 +192,24 @@ left_source, right_subject = st.columns(2)
 
 with left_source:
     st.subheader("Sentiment distribution by source", text_alignment="center")
-    fig_source = px.histogram(sub_df, x="source", color="class", barmode="group")
+    fig_source = px.histogram(
+        sub_df,
+        x="source",
+        barmode="group",
+        color="class",
+        color_discrete_map=COLOR_MAP
+    )
     st.plotly_chart(fig_source)
 
 with right_subject:
     st.subheader("Sentiment distribution by subject", text_alignment="center")
-    fig_subject = px.histogram(sub_df, x="subject", color="class", barmode="group")
+    fig_subject = px.histogram(
+        sub_df,
+        x="subject",
+        barmode="group",
+        color="class",
+        color_discrete_map=COLOR_MAP
+    )
     st.plotly_chart(fig_subject)
 
 st.divider()
