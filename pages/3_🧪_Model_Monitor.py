@@ -241,27 +241,90 @@ st.divider()
 # Model Compare
 st.subheader("Model Compare", help="Run both models on the same inputs and compare outcomes")
 
-mode = st.radio("Mode", ["Single Test", "Batch Test"], horizontal=True)
-
 # Session state
+if "cmp_mode" not in st.session_state:
+    st.session_state["cmp_mode"] = None
 if "cmp_single_text" not in st.session_state:
-    st.session_state["cmp_single_text"] = SAMPLES[0]
+    st.session_state["cmp_single_text"] = ""
 if "cmp_batch_text" not in st.session_state:
+    st.session_state["cmp_batch_text"] = ""
+
+# Result session state
+for k, v in {
+    "cmp_df": None,
+    "cmp_n": 0,
+    "cmp_match_rate": None,
+    "cmp_raw_ml": None,
+    "cmp_raw_llm": None,
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+def set_single():
+    st.session_state["cmp_mode"] = "single"
+    st.session_state["cmp_single_text"] = SAMPLES[0]
+
+def set_batch():
+    st.session_state["cmp_mode"] = "batch"
     st.session_state["cmp_batch_text"] = "\n".join(SAMPLES)
 
-# Single
-if mode == "Single Test":
-    # Input area
-    st.text_area("Single text", height=200, key="cmp_single_text")
+def clear_all():
+    # Clear inputs
+    st.session_state["cmp_mode"] = None
+    st.session_state["cmp_single_text"] = ""
+    st.session_state["cmp_batch_text"] = ""
+
+    # Clear compare results
+    st.session_state["cmp_df"] = None
+    st.session_state["cmp_n"] = 0
+    st.session_state["cmp_match_rate"] = None
+    st.session_state["cmp_raw_ml"] = None
+    st.session_state["cmp_raw_llm"] = None
+
+    # Reset latency dashboard
+    st.session_state["ml_latency_ms"] = 0
+    st.session_state["llm_latency_ms"] = 0
+
+# Mode buttons
+b1, b2 = st.columns(2)
+b1.button(
+    "Single Test",
+    on_click=set_single,
+    type="primary" if st.session_state["cmp_mode"] == "single" else "secondary",
+    width="stretch",
+)
+b2.button(
+    "Batch Test",
+    on_click=set_batch,
+    type="primary" if st.session_state["cmp_mode"] == "batch" else "secondary",
+    width="stretch",
+)
+
+# Inputs
+input_texts: list[str] = []
+
+if st.session_state["cmp_mode"] == "single":
+    st.text_area(
+        "Single text",
+        height=200,
+        key="cmp_single_text",
+        placeholder="Paste a crypto news here..."
+    )
     raw_texts = [st.session_state["cmp_single_text"]]
+    input_texts = [t.strip() for t in raw_texts if t and t.strip()]
 
-# Batch
-else:
-    # Input area
-    st.text_area("Batch texts", height=200, key="cmp_batch_text")
+elif st.session_state["cmp_mode"] == "batch":
+    st.text_area(
+        "Batch texts",
+        height=200,
+        key="cmp_batch_text",
+        placeholder="Paste a crypto news here..."
+    )
     raw_texts = st.session_state["cmp_batch_text"].splitlines()
+    input_texts = [t.strip() for t in raw_texts if t and t.strip()]
 
-input_texts = [t.strip() for t in raw_texts if t and t.strip()]
+else:
+    st.info("Choose a mode above to auto-fill samples")
 
 # Preview
 with st.expander("Request JSON preview"):
@@ -273,8 +336,8 @@ def clear_input():
 
 # Button
 left_button, right_button = st.columns(2)
-clear = right_button.button("Clear", on_click=clear_input, width="stretch")
 compare = left_button.button("Compare", type="primary", width="stretch")
+clear = right_button.button("Clear", on_click=clear_all, width="stretch")
 
 # Define button behavior
 if compare:
@@ -290,7 +353,7 @@ if compare:
             st.stop()
 
         # Call LLM
-        ok_llm, msg_llm = post(f"{FASTAPI_URI}/predict_llm", payload, timeout=20)        
+        ok_llm, msg_llm = post(f"{FASTAPI_URI}/predict_llm", payload, timeout=20)
         if not ok_llm:
             st.error(f"LLM API error: {msg_llm}")
             st.stop()
@@ -303,41 +366,52 @@ if compare:
         llm_preds = (msg_llm or {}).get("predictions", []) or []
 
         # Align rows
-        n = min(len(input_texts), len(ml_preds), len(llm_preds))        
-        
+        n = min(len(input_texts), len(ml_preds), len(llm_preds))
+
         rows = []
         for i in range(n):
             ml_sentiment, ml_max_prob = extract_ml_row(ml_preds[i])
             llm_sentiment, llm_score = extract_llm_row(llm_preds[i])
-            
+
             rows.append({
                 "text": input_texts[i].strip()[:30] + "...",
                 "ml_sentiment": ml_sentiment,
                 "ml_max_prob": ml_max_prob,
                 "llm_sentiment": llm_sentiment,
                 "llm_score": llm_score,
-                "match": (ml_sentiment == llm_sentiment) if (ml_sentiment is not None and llm_sentiment is not None) else None
+                "match": (ml_sentiment == llm_sentiment)
+                if (ml_sentiment is not None and llm_sentiment is not None)
+                else None
             })
 
         df = pd.DataFrame(rows)
-
-        # KPIs
-        k1, k2 = st.columns(2)
-
-        k1.metric("Compared texts", n)
         
+        match_rate = None
         if "match" in df.columns and n > 0:
             match_rate = df["match"].mean() if df["match"].notna().any() else None
-        
-        k2.metric("Match rate", f"{match_rate:.1%}" if match_rate is not None else "N/A")
 
-        st.dataframe(df)
+        # Save results for reruns / clear
+        st.session_state["cmp_df"] = df
+        st.session_state["cmp_n"] = n
+        st.session_state["cmp_match_rate"] = match_rate
+        st.session_state["cmp_raw_ml"] = msg_ml
+        st.session_state["cmp_raw_llm"] = msg_llm
 
-        with st.expander("Raw ML response"):
-            st.json(msg_ml)
-        
-        with st.expander("Raw LLM response"):
-            st.json(msg_llm)
+# KPIs
+if st.session_state["cmp_df"] is not None:
+    k1, k2 = st.columns(2)
+    k1.metric("Compared texts", st.session_state["cmp_n"])
+
+    mr = st.session_state["cmp_match_rate"]
+    k2.metric("Match rate", f"{mr:.1%}" if mr is not None else "N/A")
+
+    st.dataframe(st.session_state["cmp_df"])
+
+    with st.expander("Raw ML response"):
+        st.json(st.session_state["cmp_raw_ml"])
+
+    with st.expander("Raw LLM response"):
+        st.json(st.session_state["cmp_raw_llm"])
 
 # Latency Dashboard
 st.subheader("Latency Dashboard")
