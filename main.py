@@ -5,7 +5,7 @@ import argparse
 from dotenv import load_dotenv
 
 from data import data_preparation
-from model import logistic_regression
+from ml_model import logistic_regression
 from mlops import ml_workflow, llm_workflow
 
 logger = logging.getLogger(__name__)

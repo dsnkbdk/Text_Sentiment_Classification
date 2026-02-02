@@ -5,7 +5,6 @@ from mlflow import MlflowClient
 from mlflow.models import infer_signature
 from mlflow.exceptions import RestException
 from sklearn.metrics import classification_report, f1_score
-from hf_sentiment import sentiment_pipeline, predict_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +112,8 @@ def llm_workflow(
     *,
     experiment_name: str,
     run_name_prefix: str,
-    model_name: str,
+    classifier: callable,
+    model: str,
     registered_model_name: str,
     X_test,
     y_test,
@@ -128,38 +128,61 @@ def llm_workflow(
     with mlflow.start_run(run_name=f"{run_name_prefix} {pd.Timestamp.now().floor('s')}"):
         
         # Log params
-        params = {
-            "hf_model_name": model_name,
-            "batch_size": batch_size,
-            "max_length": max_length,
-            "device": device
-        }
-        mlflow.log_params(params)
+        mlflow.log_params(
+            {
+                "model": model,
+                "device": device,
+                "batch_size": batch_size,
+                "max_length": max_length
+            }
+        )
 
-        clf = sentiment_pipeline(model_name=model_name, device=device)
+        clf = classifier(model=model, device=device)
+
+        logger.info(f"Loading complete, start inferencing")
         
         # inference
-        pred = predict_sentiment(
-            clf=clf,
-            texts=X_test.to_list(),
+        pred = clf(
+            inputs=X_test.to_list(),
             batch_size=batch_size,
-            max_length=max_length
+            max_length=max_length,
+            truncation=True
         )
-        y_pred = pred["pred_labels"]
+        
+        y_pred: list[str] = []
+        y_score: list[float] = []
+        
+        for dict_p in pred:
+            # {'label': 'negative/neutral/positive', 'score': float}
+            y_pred.append(dict_p["label"])
+            y_score.append(dict_p["score"])
+
+        # Evaluate
         test_f1_score = f1_score(y_test, y_pred, average="macro")
 
         # Log the evaluation results
         mlflow.log_metric("test_f1_score", test_f1_score)
         mlflow.log_text(classification_report(y_test, y_pred), "test_report.txt")
 
+        pip_requirements = [
+            "huggingface_hub==1.3.4",
+            "numpy==1.26.4",
+            "packaging==25.0",
+            "safetensors==0.7.0",
+            "tokenizers==0.22.2",
+            "torch==2.2.2",
+            "transformers==5.0.0"
+        ]
+
         # Log and register the best model
         model_info = mlflow.transformers.log_model(
             transformers_model=clf,
-            name="llm_estimator",
+            name="best_estimator",
             registered_model_name=registered_model_name,
-            signature=infer_signature(X_test.to_list(), y_pred)
+            signature=infer_signature(X_test.to_list(), y_pred),
+            pip_requirements=pip_requirements
         )
-        logger.info(f"The llm model (ver.{model_info.registered_model_version}) is registered")
+        logger.info(f"The best model (ver.{model_info.registered_model_version}) is registered")
         
         # Model promotion
         relegate_and_promote(
@@ -175,7 +198,8 @@ if __name__ == '__main__':
 
     from dotenv import load_dotenv
     from data import data_preparation
-    from model import logistic_regression
+    from ml_model import logistic_regression
+    from llm_model import cardiffnlp_roberta
     
     logging.basicConfig(
         level=logging.INFO,
@@ -188,13 +212,7 @@ if __name__ == '__main__':
     REGISTERED_ML_MODEL_NAME = "TFIDF_Logistic_Regression"
     REGISTERED_LLM_MODEL_NAME = "HF_Cardiffnlp_RoBERTa_Sentiment"
 
-    param_grid = {
-        "tfidf__ngram_range": [(1, 1), (1, 2)],
-        "tfidf__max_df": [0.8, 0.9],
-        "tfidf__min_df": [5, 10],
-        "clf__max_iter": [200, 500]
-    }
-
+    # DATA
     try:
         X_train, X_test, y_train, y_test = data_preparation(
             dataset="oliviervha/crypto-news",
@@ -205,7 +223,15 @@ if __name__ == '__main__':
         logger.exception("Smoke test failed")
         raise
 
+    # ML
     # try:
+    #     param_grid = {
+    #         "tfidf__ngram_range": [(1, 1), (1, 2)],
+    #         "tfidf__max_df": [0.8, 0.9],
+    #         "tfidf__min_df": [5, 10],
+    #         "clf__max_iter": [200, 500]
+    #     }
+
     #     ml_workflow(
     #         experiment_name="Sentiment_Logistic_Regression",
     #         run_name_prefix="logreg_gridsearch",
@@ -222,11 +248,13 @@ if __name__ == '__main__':
     #     logger.exception("Smoke test failed")
     #     raise
 
+    # LLM
     try:
         llm_workflow(
         experiment_name="Sentiment_Open_Source_LLM",
         run_name_prefix="cardiffnlp_pipeline",
-        model_name="cardiffnlp/twitter-roberta-base-sentiment-latest",
+        classifier=cardiffnlp_roberta,
+        model="cardiffnlp/twitter-roberta-base-sentiment-latest",
         registered_model_name=REGISTERED_LLM_MODEL_NAME,
         X_test=X_test,
         y_test=y_test,

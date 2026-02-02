@@ -6,6 +6,7 @@ from sklearn.model_selection import StratifiedKFold, GridSearchCV
 
 logger = logging.getLogger(__name__)
 
+# Traditional ML
 def logistic_regression(
     *,
     X_train,
