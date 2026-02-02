@@ -14,6 +14,17 @@ SAMPLES = [
     "Crypto prices plunge after exchange hack fears spark panic and heavy regulation."
 ]
 
+MODEL_OPTIONS = {
+    "ML (TFIDF_Logistic_Regression)": {
+        "endpoint": "/predict_ml",
+        "type": "ml"
+    },
+    "LLM (HF_Cardiffnlp_RoBERTa_Sentiment)": {
+        "endpoint": "/predict_llm",
+        "type": "llm"
+    }
+}
+
 st.set_page_config(page_title="Sentiment Classification Model Serving UI", layout="wide")
 st.title("Sentiment Classification Model Serving UI", text_alignment="center")
 
@@ -64,6 +75,18 @@ st.divider()
 
 # Prediction
 st.subheader("Sentiment Prediction")
+
+# Model selection
+model_name = st.radio(
+    "Model",
+    list(MODEL_OPTIONS.keys()),
+    horizontal=True
+)
+model_cfg = MODEL_OPTIONS[model_name]
+endpoint = model_cfg["endpoint"]
+model_type = model_cfg["type"]
+
+st.write(f"Calling endpoint: {FASTAPI_URI}{endpoint}")
 
 # Support both single and batch
 mode = st.radio("Mode", ["Single Test", "Batch Test"], horizontal=True)
@@ -134,7 +157,7 @@ if predict:
         st.warning("Please enter some text")
     else:
         try:
-            r = requests.post(url=f"{FASTAPI_URI}/predict", json=payload, timeout=10)
+            r = requests.post(url=f"{FASTAPI_URI}{endpoint}", json=payload, timeout=20)
             
             if r.status_code != 200:
                 st.error(f"API error: {r.status_code}")
@@ -150,6 +173,7 @@ if predict:
                 c1.metric("Latency (ms)", data.get("latency_ms", "N/A"))
                 c2.metric("Model Alias", meta.get("alias", "N/A"))
                 c3.metric("Model Version", meta.get("model_version", "N/A"))
+                
                 with st.expander("Full metadata"):
                     st.json(meta)
 
@@ -159,27 +183,47 @@ if predict:
 
                 rows = []
 
+                # Single
                 if mode == "Single Test":
                     pred = preds[0]
-                    probs = pred.get("probabilities") or {}
-                    
-                    rows.append({
-                        "text": (payload["input_text"][:30] + "..."),
-                        "sentiment": pred.get("sentiment"),
-                        "prob_negative": probs.get("negative"),
-                        "prob_neutral": probs.get("neutral"),
-                        "prob_positive": probs.get("positive")
-                    })
-                else:
-                    for i, pred in enumerate(preds):
+                    # ML
+                    if model_type == "ml":
                         probs = pred.get("probabilities") or {}
+                    
                         rows.append({
-                            "text": (payload["input_texts"][i][:30] + "..."),
+                            "text": (payload["input_text"][:30] + "..."),
                             "sentiment": pred.get("sentiment"),
                             "prob_negative": probs.get("negative"),
                             "prob_neutral": probs.get("neutral"),
                             "prob_positive": probs.get("positive")
                         })
+                    # LLM
+                    else:
+                        rows.append({
+                            "text": (payload["input_text"][:30] + "..."),
+                            "sentiment": pred.get("sentiment"),
+                            "score": pred.get("score")
+                        })
+                # Batch
+                else:
+                    for i, pred in enumerate(preds):
+                        # ML
+                        if model_type == "ml":
+                            probs = pred.get("probabilities") or {}
+                            rows.append({
+                                "text": (payload["input_texts"][i][:30] + "..."),
+                                "sentiment": pred.get("sentiment"),
+                                "prob_negative": probs.get("negative"),
+                                "prob_neutral": probs.get("neutral"),
+                                "prob_positive": probs.get("positive")
+                            })
+                        # LLM
+                        else:
+                            rows.append({
+                                "text": (payload["input_texts"][i][:30] + "..."),
+                                "sentiment": pred.get("sentiment"),
+                                "score": pred.get("score")
+                            })
                 
                 # Unified output
                 if rows:
@@ -191,5 +235,7 @@ if predict:
         
         except requests.exceptions.ConnectionError:
             st.error("Cannot connect to API")
+        except requests.exceptions.Timeout:
+            st.error("Request timeout, try again")
         except Exception as e:
             st.error(f"Unexpected error: {e}")

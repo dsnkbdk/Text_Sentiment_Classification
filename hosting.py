@@ -16,6 +16,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Examples
+openapi_examples={
+    "single": {
+        "summary": "Single test",
+        "value": {
+            "input_text": "Bitcoin rallies sharply after ETF approval, igniting strong investor enthusiasm."
+        }
+    },
+    "batch": {
+        "summary": "Batch test",
+        "value": {
+            "input_texts": [
+                "Ethereum trades sideways as investors await macroeconomic data.",
+                "Crypto prices plunge after exchange hack fears spark panic and heavy regulation."
+            ]
+        }
+    }
+}
+
 # Schemas
 SentimentLabel = Literal["negative", "neutral", "positive"]
 
@@ -33,7 +52,7 @@ class PredictRequest(BaseModel):
         description="Batch crypto news texts for sentiment classification"
     )
 
-class PredictItem(BaseModel):
+class MLPredictItem(BaseModel):
     sentiment: SentimentLabel = Field(
         ...,
         description="Predicted sentiment label"
@@ -43,8 +62,36 @@ class PredictItem(BaseModel):
         description="Probabilities of each class"
     )
 
-class PredictResponse(BaseModel):
-    predictions: List[PredictItem] = Field(
+class LLMPredictItem(BaseModel):
+    sentiment: SentimentLabel = Field(
+        ...,
+        description="Predicted sentiment label"
+    )
+    score: Optional[float] = Field(
+        default=None,
+        description="Confidence score for LLM output"
+    )
+
+class MLPredictResponse(BaseModel):
+    predictions: List[MLPredictItem] = Field(
+        ...,
+        description="Predictions for each input text"
+    )
+    model_uri: str = Field(
+        ...,
+        description="MLflow model URI used for this prediction (production alias)"
+    )
+    latency_ms: int = Field(
+        ...,
+        description="Inference latency (ms)"
+    )
+    meta: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Model metadata"
+    )
+
+class LLMPredictResponse(BaseModel):
+    predictions: List[LLMPredictItem] = Field(
         ...,
         description="Predictions for each input text"
     )
@@ -66,25 +113,7 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = None
 
 
-def fast_api(
-        *,
-        mlflow_tracking_uri: str,
-        registered_model_name: str
-    ) -> FastAPI:
-    
-    # Configure mlflow
-    mlflow.set_tracking_uri(mlflow_tracking_uri)
-    model_uri = f"models:/{registered_model_name}@production"
-
-    # Load prod model
-    logger.info(f"Loading prod model from {model_uri}")
-    
-    try:
-        model = mlflow.sklearn.load_model(model_uri)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model from '{model_uri}': {e}") from e
-    
-    # Get model metadata
+def get_meta(registered_model_name: str) -> Dict[str, Any]:
     meta = {
         "registered_model_name": registered_model_name,
         "alias": "production"
@@ -99,10 +128,74 @@ def fast_api(
         })
     except Exception:
         pass
+    return meta
 
+
+def clean_input(req: PredictRequest) -> List[str]:
+    if req.input_text is not None:
+        raw_text = [req.input_text]
+    elif req.input_texts is not None:
+        raw_text = req.input_texts
+    else:
+        raw_text = []
+
+    input_text: List[str] = []
+    for text in raw_text:
+        if not isinstance(text, str):
+            continue
+        # Avoid empty text such as "    "
+        string = text.strip()
+        if string:
+            input_text.append(string)
+
+    if not input_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Field 'input_text' must be a string or 'input_texts' must be a list of strings"
+        )
+    return input_text
+
+
+def fast_api(
+        *,
+        mlflow_tracking_uri: str,
+        ml_registered_model_name: str,
+        llm_registered_model_name: str,
+        llm_batch_size: int = 16,
+        llm_max_length: int = 256
+    ) -> FastAPI:
+    
+    # Configure mlflow
+    mlflow.set_tracking_uri(mlflow_tracking_uri)
+
+    # ML model
+    ml_model_uri = f"models:/{ml_registered_model_name}@production"
+    logger.info(f"Loading ML prod model from {ml_model_uri}")
+    
+    try:
+        ml_model = mlflow.sklearn.load_model(ml_model_uri)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load ML model from '{ml_model_uri}': {e}") from e
+    
+    # Get ML model metadata
+    ml_meta = get_meta(ml_registered_model_name)
+
+    # LLM model
+    llm_model_uri = f"models:/{llm_registered_model_name}@production"
+    logger.info(f"Loading LLM prod model from {llm_model_uri}")
+    
+    try:
+        llm_model = mlflow.transformers.load_model(llm_model_uri)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load LLM model from '{llm_model_uri}': {e}") from e
+    
+    # Get LLM model metadata
+    llm_meta = get_meta(llm_registered_model_name)
+
+    # Build app
     app = FastAPI(
         title="Text Sentiment Classification API",
-        version="1.0.0",
+        version="1.1.0",
         openapi_tags=[
             {
                 "name": "Health",
@@ -149,84 +242,51 @@ def fast_api(
     def status():
         return {
             "mlflow_tracking_uri": mlflow_tracking_uri,
-            "model_uri": model_uri,
-            "meta": meta
+            "ml_model_uri": ml_model_uri,
+            "ml_meta": ml_meta,
+            "llm_model_uri": llm_model_uri,
+            "llm_meta": llm_meta,
+            "llm_batch_size": llm_batch_size,
+            "llm_max_length": llm_max_length
         }
 
-    # Prediction
+    # Prediction ML
     @app.post(
-        "/predict",
+        "/predict_ml",
         tags=["Prediction"],
-        response_model=PredictResponse,
+        response_model=MLPredictResponse,
         responses={
             400: {"model": ErrorResponse, "description": "Bad request (missing or invalid input)"},
             500: {"model": ErrorResponse, "description": "Internal error"},
             503: {"model": ErrorResponse, "description": "Model not available (MLflow loading error)"}
         }
     )
-    async def predict(
+    async def predict_ml(
         req: PredictRequest = Body(
             ...,
-            openapi_examples={
-                "single": {
-                    "summary": "Single test",
-                    "value": {
-                        "input_text": "Bitcoin rallies sharply after ETF approval, igniting strong investor enthusiasm."
-                    }
-                },
-                "batch": {
-                    "summary": "Batch test",
-                    "value": {
-                        "input_texts": [
-                            "Ethereum trades sideways as investors await macroeconomic data.",
-                            "Crypto prices plunge after exchange hack fears spark panic and heavy regulation."
-                        ]
-                    }
-                }
-            }
+            openapi_examples=openapi_examples
         )
     ):
 
-        if req.input_text is not None:
-            raw_text = [req.input_text]
-        elif req.input_texts is not None:
-            raw_text = req.input_texts
-        else:
-            raw_text = []
-
-        input_text: List[str] = []
-        for text in raw_text:
-            if not isinstance(text, str):
-                continue
-            # Avoid empty text such as "    "
-            string = text.strip()
-            if string:
-                input_text.append(string)
-
-        if not input_text:
-            raise HTTPException(
-                status_code=400,
-                detail="Field 'input_text' must be a string or 'input_texts' must be a list of strings"
-            )
-        
-        logger.info(f"Predict request received (texts={len(input_text)})")
+        input_text = clean_input(req)
+        logger.info(f"ML predict request received (texts={len(input_text)})")
         
         start = time.perf_counter()
 
         # MLflow signature expects list/Series
         try:
-            preds = model.predict(input_text)
+            preds = ml_model.predict(input_text)
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Model prediction failed: {e}") from e
+            raise HTTPException(status_code=503, detail=f"ML model prediction failed: {e}") from e
         
         # Probabilities
         probas = None
-        probas = None
+        classes = None
 
-        if hasattr(model, "predict_proba"):
+        if hasattr(ml_model, "predict_proba"):
             try:
-                probas = model.predict_proba(input_text)
-                classes = list(getattr(model, "classes_", []))
+                probas = ml_model.predict_proba(input_text)
+                classes = list(getattr(ml_model, "classes_", []))
             except Exception:
                 probas = None
                 classes = None
@@ -237,7 +297,8 @@ def fast_api(
         for i, pred in enumerate(preds):
             item = {
                 "sentiment": str(pred),
-                "probabilities": None
+                "probabilities": None,
+                "score": None
             }
             if probas is not None and classes:
                 item["probabilities"] = {
@@ -245,13 +306,66 @@ def fast_api(
                 }
             outcomes.append(item)
         
-        logger.info(f"Predict success (items={len(input_text)}), latency_ms={latency_ms}")
+        logger.info(f"ML predict success (items={len(input_text)}), latency_ms={latency_ms}")
 
         return {
             "predictions": outcomes,
-            "model_uri": model_uri,
+            "model_uri": ml_model_uri,
             "latency_ms": latency_ms,
-            "meta": meta
+            "meta": ml_meta
+        }
+
+    # Prediction LLM
+    @app.post(
+        "/predict_llm",
+        tags=["Prediction"],
+        response_model=LLMPredictResponse,
+        responses={
+            400: {"model": ErrorResponse, "description": "Bad request (missing or invalid input)"},
+            500: {"model": ErrorResponse, "description": "Internal error"},
+            503: {"model": ErrorResponse, "description": "Model not available (MLflow loading error)"}
+        }
+    )
+    async def predict_llm(
+        req: PredictRequest = Body(
+            ...,
+            openapi_examples=openapi_examples
+        )
+    ):
+
+        input_text = clean_input(req)
+        logger.info(f"LLM predict request received (texts={len(input_text)})")
+        
+        start = time.perf_counter()
+
+        # MLflow signature expects list/Series
+        try:
+            preds = llm_model(
+                inputs=input_text,
+                batch_size=llm_batch_size,
+                max_length=llm_max_length,
+                truncation=True
+            )
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"LLM model prediction failed: {e}") from e
+
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        
+        outcomes = []
+        for dict_p in preds:
+            outcomes.append({
+                "sentiment": dict_p["label"],
+                "score": dict_p["score"],
+                "probabilities": None
+            })
+
+        logger.info(f"LLM predict success (items={len(input_text)}), latency_ms={latency_ms}")
+
+        return {
+            "predictions": outcomes,
+            "model_uri": llm_model_uri,
+            "latency_ms": latency_ms,
+            "meta": llm_meta
         }
 
     return app
@@ -266,4 +380,9 @@ load_dotenv()
 
 app = fast_api(
     mlflow_tracking_uri=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000"),
-    registered_model_name="TFIDF_Logistic_Regression")
+    ml_registered_model_name="TFIDF_Logistic_Regression",
+    llm_registered_model_name="HF_Cardiffnlp_RoBERTa_Sentiment",
+    llm_batch_size= 16,
+    llm_max_length= 256
+    )
+

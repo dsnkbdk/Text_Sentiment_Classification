@@ -141,7 +141,7 @@ def llm_workflow(
 
         logger.info(f"Loading complete, start inferencing")
         
-        # inference
+        # Inference
         pred = clf(
             inputs=X_test.to_list(),
             batch_size=batch_size,
@@ -209,8 +209,8 @@ if __name__ == '__main__':
     
     load_dotenv()
     RANDOM_STATE = 2026
-    REGISTERED_ML_MODEL_NAME = "TFIDF_Logistic_Regression"
-    REGISTERED_LLM_MODEL_NAME = "HF_Cardiffnlp_RoBERTa_Sentiment"
+    ML_REGISTERED_MODEL_NAME = "TFIDF_Logistic_Regression"
+    LLM_REGISTERED_MODEL_NAME = "HF_Cardiffnlp_RoBERTa_Sentiment"
 
     # DATA
     try:
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     #         experiment_name="Sentiment_Logistic_Regression",
     #         run_name_prefix="logreg_gridsearch",
     #         classifier=logistic_regression,
-    #         registered_model_name=REGISTERED_ML_MODEL_NAME,
+    #         registered_model_name=ML_REGISTERED_MODEL_NAME,
     #         X_train=X_train,
     #         X_test=X_test,
     #         y_train=y_train,
@@ -255,13 +255,13 @@ if __name__ == '__main__':
         run_name_prefix="cardiffnlp_pipeline",
         classifier=cardiffnlp_roberta,
         model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-        registered_model_name=REGISTERED_LLM_MODEL_NAME,
+        registered_model_name=LLM_REGISTERED_MODEL_NAME,
         X_test=X_test,
         y_test=y_test,
         batch_size=16,
-        max_length=256,
-        device=None
+        max_length=256
     )
     except Exception:
         logger.exception("Smoke test failed")
         raise
+
