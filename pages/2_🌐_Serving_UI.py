@@ -235,7 +235,9 @@ if predict:
         
         except requests.exceptions.ConnectionError:
             st.error("Cannot connect to API")
+        
         except requests.exceptions.Timeout:
             st.error("Request timeout, try again")
+        
         except Exception as e:
             st.error(f"Unexpected error: {e}")
