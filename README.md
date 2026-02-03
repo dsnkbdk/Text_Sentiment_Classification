@@ -37,14 +37,14 @@ Key objectives:
 ├── .env                            # Environment variables
 ├── .env.example                    # Environment variable template
 ├── .gitignore                      # Git ignore rules
-├── data.py                         # Data loading and preprocessing
 ├── Home.py                         # Streamlit home page (entry point)
-├── hosting.py                      # Model hosting / serving
-├── llm_model.py                    # LLM-related logic
 ├── main.py                         # Main orchestration script
+├── data.py                         # Data loading and preprocessing
 ├── ml_model.py                     # Machine learning model logic
-├── mlflow.db                       # MLflow backend database (SQLite)
+├── llm_model.py                    # LLM-related logic
 ├── mlops.py                        # MLOps pipeline utilities
+├── hosting.py                      # Model hosting / serving
+├── mlflow.db                       # MLflow backend database (SQLite)
 ├── prototype.ipynb                 # Experimental notebook
 ├── README.md                       # Project documentation
 └── requirements.txt                # Python dependencies
