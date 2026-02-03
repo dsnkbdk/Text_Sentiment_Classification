@@ -421,12 +421,6 @@ Sensitive credentials are excluded from version control and expected to be provi
 source .venv/bin/activate
 ```
 
-### 11.1 Activate Virtual Environment
-
-```bash
-source .venv/bin/activate
-```
-
 ### 11.2 Start MLflow Tracking Server
 
 ```bash
@@ -518,50 +512,10 @@ Formal automated testing has not yet been implemented.
 
 This project demonstrates how a sentiment classification pipeline can be built with **production-oriented engineering practices**, combining:
 
-- Multiple modeling paradigms
+- Multiple modelling paradigms
 - Robust MLOps
 - Local serving infrastructure
-- Interactive visualization and monitoring
+- Interactive visualisation and monitoring
 
 It is designed to be clear, extensible, and technically reviewable, making trade-offs explicit and reproducible.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-1. 环境配置3.12，requirement
-
-
-Dependencies
-4. Configuration Files
-
-未来工作，单元测试
