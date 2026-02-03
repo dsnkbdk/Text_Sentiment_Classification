@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 
 load_dotenv()
 FASTAPI_URI=os.getenv("FASTAPI_URI", "http://localhost:8000")
+MLFLOW_TRACKING_URI=os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 SAMPLES = [
     "Bitcoin rallies sharply after ETF approval, igniting strong investor enthusiasm.",
@@ -120,7 +121,9 @@ if "llm_latency_ms" not in st.session_state:
 st.subheader("Model Status")
 
 # Set button
-model_status = st.button("Check Model Status", width="stretch")
+lift, right = st.columns(2)
+model_status = lift.button("Check Model Status", width="stretch")
+right.link_button(label="Open MLflow", url=MLFLOW_TRACKING_URI, width="stretch")
 
 # Status init
 ok_health: bool | None = None
