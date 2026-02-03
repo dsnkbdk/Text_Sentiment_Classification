@@ -1,4 +1,5 @@
 import streamlit as st
+from pathlib import Path
 
 st.set_page_config(page_title="Crypto News Sentiment Classification", layout="wide")
 st.title("Crypto News Sentiment Classification Platform", text_alignment="center")
@@ -49,10 +50,12 @@ st.subheader("🏗️ System Architecture", text_alignment="center")
 with st.container(horizontal_alignment="center", vertical_alignment="center"):
     st.image("assets/Architecture.png")
 
+st.divider()
+
+st.subheader("Welcome!")
+
 st.markdown(
     """
-    Welcome!
-
     Open pages from the **Left Sidebar**
     
     - 📊 **Dashboard:** Explore crypto news sentiment analytics
