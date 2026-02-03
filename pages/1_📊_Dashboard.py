@@ -10,6 +10,7 @@ st.title("Crypto News Sentiment Dashboard", text_alignment="center")
 st.markdown(
     """
     <style>
+    /* metric */
     [data-testid="stMetricLabel"] {
         display: block;
         text-align: center;
@@ -75,13 +76,15 @@ st.sidebar.header("Filters")
 min_date = df["date"].min().date()
 max_date = df["date"].max().date()
 
+if "date_range" not in st.session_state:
+    st.session_state["date_range"] = (min_date, max_date)
+
 if st.sidebar.button("Reset date range", width="stretch"):
     st.session_state["date_range"] = (min_date, max_date)
     st.rerun()
 
 date_range = st.sidebar.date_input(
     label="Date range",
-    value=st.session_state.get("date_range", (min_date, max_date)),
     min_value=min_date,
     max_value=max_date,
     key="date_range"
