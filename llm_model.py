@@ -4,7 +4,7 @@ from transformers import pipeline
 
 logger = logging.getLogger(__name__)
 
-# Open-source LLM
+# Open-source LLM (Encoder-only)
 def cardiffnlp_roberta(
         *,
         model: str,

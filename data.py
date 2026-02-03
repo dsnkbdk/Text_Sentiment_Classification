@@ -65,6 +65,8 @@ def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(f"Dropping {invalid_class.sum()} rows due to invalid class")
         df = df.loc[~invalid_class].reset_index(drop=True)
 
+    df = df.sort_values("date").reset_index(drop=True)
+
     # Class distribution
     logger.info(f"Class distribution (count):\n{df['class'].value_counts().to_string()}")
     logger.info(f"Class distribution (ratio):\n{df['class'].value_counts(normalize=True).to_string()}")
