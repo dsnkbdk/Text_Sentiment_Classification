@@ -45,9 +45,9 @@ Key objectives:
 ├── mlops.py                        # MLOps pipeline utilities
 ├── hosting.py                      # Model hosting / serving
 ├── mlflow.db                       # MLflow backend database (SQLite)
-├── prototype.ipynb                 # Experimental notebook
 ├── README.md                       # Project documentation
 └── requirements.txt                # Python dependencies
+└── exploratory analysis.ipynb      # Exploratory analysis notebook
 ```
 
 ## 3. System Architecture
