@@ -65,7 +65,14 @@ def data_cleaning(df: pd.DataFrame) -> pd.DataFrame:
         logger.warning(f"Dropping {invalid_class.sum()} rows due to invalid class")
         df = df.loc[~invalid_class].reset_index(drop=True)
 
-    df = df.sort_values("date").reset_index(drop=True)
+    before = len(df)
+
+    df = (
+        df.sort_values("date")
+        .drop_duplicates(subset=["text", "title", "class"], keep="first")
+        .reset_index(drop=True)
+    )
+    logger.warning(f"Dropping {before - len(df)} duplicate rows")
 
     # Class distribution
     logger.info(f"Class distribution (count):\n{df['class'].value_counts().to_string()}")
